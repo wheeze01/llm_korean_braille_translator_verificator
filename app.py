@@ -24,25 +24,6 @@ from modules.prompts import (
 )
 
 # ----------------------------
-# [Cache Data] 캐싱 데이터 (정답지)
-# ----------------------------
-PREDEFINED_DATA = {
-    # 1. [요약 케이스] 자동차 관세
-    "summary_case_src": """미 상무부와 무역대표부(USTR)는 24일(현지시간) 유럽연합(EU)과의 무역협정 이행과 관련한 문서를 공개했다. 여기에는 유럽산 자동차 수입에 대한 관세를 8월 1일부로 앞당겨 적용해 현 27.5%에서 15%로 낮추는 내용이 담겼다. 유럽 자동차 기업들은 차액을 돌려받고 앞으로는 15%의 관세만 낸다. 앞서 일본도 자동차 관세가 15%로 낮아졌다. 이 소식이 전해지자 유럽 완성차 업계에 대한 우려는 다소 줄었다. 24일 독일 증시에서 포르셰 주가는 장중 3.8%가 급등했다 2.2% 오른 채 마감했다. BMW와 메르세데스-벤츠 주가도 각각 1.4%, 1.1% 상승했다.""",
-    "summary_case_sum": """미국 상무부와 무역대표부(USTR)는 유럽연합(EU)과의 무역협정 이행 문서를 공개하며, 8월 1일부터 유럽산 자동차 수입 관세를 기존 27.5%에서 15%로 인하한다고 발표했다. 이에 따라 유럽 자동차 기업들은 차액을 돌려받고 향후 15%의 관세만 부담하게 된다. 일본에 이어 유럽산 자동차 관세도 인하되면서 유럽 완성차 업계의 우려가 줄었고, 독일 증시에서 포르셰, BMW, 메르세데스-벤츠 등 주요 자동차 기업들의 주가가 상승 마감했다.""",
-    "summary_case_braille": """⠑⠕⠈⠍⠁ ⠇⠶⠑⠍⠘⠍⠧ ⠑⠍⠱⠁⠊⠗⠙⠬⠘⠍⠦⠄⠴⠠⠠⠥⠎⠞⠗⠠⠴⠉⠵ ⠩⠐⠎⠃⠡⠚⠃⠦⠄⠴⠠⠠⠑⠥⠠⠴⠈⠧⠺ ⠑⠍⠱⠁⠚⠱⠃⠨⠻ ⠕⠚⠗⠶ ⠑⠛⠠⠎⠐⠮ ⠈⠿⠈⠗⠚⠑⠱⠐ ⠼⠓⠏⠂ ⠼⠁⠕⠂⠘⠍⠓⠎ ⠩⠐⠎⠃⠇⠒ ⠨⠊⠿⠰⠣ ⠠⠍⠕⠃ ⠈⠧⠒⠠⠝⠐⠮ ⠈⠕⠨⠷ ⠼⠃⠛⠲⠑⠴⠏ ⠝⠠⠎ ⠼⠁⠑⠴⠏ ⠐⠥ ⠟⠚⠚⠒⠊⠈⠥ ⠘⠂⠙⠬⠚⠗⠌⠊⠲ ⠕⠝ ⠠⠊⠐⠣ ⠩⠐⠎⠃ ⠨⠊⠿⠰⠣ ⠈⠕⠎⠃⠊⠮⠵ ⠰⠣⠗⠁⠮ ⠊⠥⠂⠐⠱⠘⠔⠈⠥ ⠚⠜⠶⠚⠍ ⠼⠁⠑⠴⠏ ⠺ ⠈⠧⠒⠠⠝⠑⠒ ⠘⠍⠊⠢⠚⠈⠝ ⠊⠽⠒⠊⠲ ⠕⠂⠘⠷⠝ ⠕⠎ ⠩⠐⠎⠃⠇⠒ ⠨⠊⠿⠰⠣ ⠈⠧⠒⠠⠝⠊⠥ ⠟⠚⠊⠽⠑⠡⠠⠎ ⠩⠐⠎⠃ ⠧⠒⠠⠻⠰⠣ ⠎⠃⠈⠌⠺ ⠍⠐⠱⠫ ⠨⠯⠎⠌⠈⠥⠐ ⠊⠭⠕⠂ ⠨⠪⠶⠠⠕⠝⠠⠎ ⠙⠥⠐⠪⠠⠌⠐ ⠴⠠⠠⠃⠍⠺⠐ ⠑⠝⠐⠪⠠⠝⠊⠝⠠⠪⠤⠘⠝⠒⠰⠪ ⠊⠪⠶ ⠨⠍⠬ ⠨⠊⠿⠰⠣ ⠈⠕⠎⠃⠊⠮⠺ ⠨⠍⠫⠫ ⠇⠶⠠⠪⠶ ⠑⠫⠢⠚⠗⠌⠊⠲""",
-    # 2. [일반 번역] 환전
-    "trans_1_src": """이 서비스로 환전 가능한 통화는 미국 달러(USD), 일본 엔화(JPY), 유럽 유로화(EUR), 중국 위안화(CNY)등 총 14개의 외국 통화로, 미국 달러(USD) 90%, 일본 엔화(JPY)와 유럽 유로화(EUR) 80%의 추가 이벤트 환율 우대를 제공한다.""",
-    "trans_1_tgt": """⠕ ⠠⠎⠘⠕⠠⠪⠐⠥ ⠚⠧⠒⠨⠾ ⠫⠉⠪⠶⠚⠒ ⠓⠿⠚⠧⠉⠵ ⠑⠕⠈⠍⠁ ⠊⠂⠐⠎⠦⠄⠴⠠⠠⠥⠎⠙⠠⠴⠐ ⠕⠂⠘⠷ ⠝⠒⠚⠧⠦⠄⠴⠠⠠⠚⠏⠽⠠⠴⠐ ⠩⠐⠎⠃ ⠩⠐⠥⠚⠧⠦⠄⠴⠠⠠⠑⠥⠗⠠⠴⠐ ⠨⠍⠶⠈⠍⠁ ⠍⠗⠣⠒⠚⠧⠦⠄⠴⠠⠠⠉⠝⠽⠠⠴⠊⠪⠶ ⠰⠿ ⠼⠁⠙⠈⠗⠺ ⠽⠈⠍⠁ ⠓⠿⠚⠧⠐⠥⠐ ⠑⠕⠈⠍⠁ ⠊⠂⠐⠎⠦⠄⠴⠠⠠⠥⠎⠙⠠⠴ ⠼⠊⠚⠴⠏⠐ ⠕⠂⠘⠷ ⠝⠒⠚⠧⠦⠄⠴⠠⠠⠚⠏⠽⠠⠴⠧ ⠩⠐⠎⠃ ⠩⠐⠥⠚⠧⠦⠄⠴⠠⠠⠑⠥⠗⠠⠴ ⠼⠓⠚⠴⠏ ⠺ ⠰⠍⠫ ⠕⠘⠝⠒⠓⠪ ⠚⠧⠒⠩⠂ ⠍⠊⠗⠐⠮ ⠨⠝⠈⠿⠚⠒⠊⠲""",
-    # 3. [일반 번역] 한양도성
-    "trans_2_src": """한양도성문화제는 10월 1일~2일 흥인지문 공원에서 열린다. 한양도성 순성을 완주한 시민에게 메달을 증정하는 △순성챌린지, 걸음수에 따라 기부를 할 수 있는 △순성기부런(run)과 △순성술래잡기놀이 △북콘서트 ‘한양도성 북살롱’ 등이 개최된다.""",
-    "trans_2_tgt": """⠚⠒⠜⠶⠊⠥⠠⠻⠑⠛⠚⠧⠨⠝⠉⠵ ⠼⠁⠚⠏⠂ ⠼⠁⠕⠂⠈⠔⠼⠃⠕⠂ ⠚⠪⠶⠟⠨⠕⠑⠛ ⠈⠿⠏⠒⠝⠠⠎ ⠳⠐⠟⠊⠲ ⠚⠒⠜⠶⠊⠥⠠⠻ ⠠⠛⠠⠻⠮ ⠧⠒⠨⠍⠚⠒ ⠠⠕⠑⠟⠝⠈⠝ ⠑⠝⠊⠂⠮ ⠨⠪⠶⠨⠻⠚⠉⠵ ⠸⠬⠠⠛⠠⠻⠰⠗⠂⠐⠟⠨⠕⠐ ⠈⠞⠪⠢⠠⠍⠝ ⠠⠊⠐⠣ ⠈⠕⠘⠍⠐⠮ ⠚⠂ ⠠⠍ ⠕⠌⠉⠵ ⠸⠬⠠⠛⠠⠻⠈⠕⠘⠍⠐⠾⠦⠄⠴⠗⠥⠝⠠⠴⠈⠧ ⠸⠬⠠⠛⠠⠻⠠⠯⠐⠗⠨⠃⠈⠕⠉⠥⠂⠕ ⠸⠬⠘⠍⠁⠋⠷⠠⠎⠓⠪ ⠠⠦⠚⠒⠜⠶⠊⠥⠠⠻ ⠘⠍⠁⠇⠂⠐⠿⠴⠄ ⠊⠪⠶⠕ ⠈⠗⠰⠽⠊⠽⠒⠊⠲""",
-    # 4. [일반 번역] 에이핑크
-    "trans_3_src": """에이핑크(Apink) 정은지가 다채로운 감성의 수록곡을 예고하며 새 앨범에 대한 기대를 높이고 있다.""",
-    "trans_3_tgt": """⠝⠕⠙⠕⠶⠋⠪⠦⠄⠴⠠⠁⠏⠔⠅⠠⠴ ⠨⠻⠵⠨⠕⠫ ⠊⠰⠗⠐⠥⠛ ⠫⠢⠠⠻⠺ ⠠⠍⠐⠭⠈⠭⠮ ⠌⠈⠥⠚⠑⠱ ⠠⠗ ⠗⠂⠘⠎⠢⠝ ⠊⠗⠚⠒ ⠈⠕⠊⠗⠐⠮ ⠉⠥⠲⠕⠈⠥ ⠕⠌⠊⠲""",
-}
-
-# ----------------------------
 # 환경 설정
 # ----------------------------
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -182,18 +163,8 @@ def normalize_text(text: str) -> str:
 
 def gemini_summarize(text: str, source_language: str) -> str:
     normalized_input = normalize_text(text)
-    normalized_cached_src = normalize_text(PREDEFINED_DATA["summary_case_src"])
 
-    progress_text = "Gemini 연결 중..."
     my_bar = st.progress(0, text=progress_text)
-
-    if normalized_input == normalized_cached_src:
-        logger.info("[Cache Hit] Summarization")
-        for percent_complete in range(0, 101, 20):
-            time.sleep(0.3)
-            my_bar.progress(percent_complete, text="텍스트 요약 중...")
-        my_bar.empty()
-        return PREDEFINED_DATA["summary_case_sum"]
 
     client = genai.Client(api_key=GEMINI_API_KEY)
     cfg = genai.types.GenerateContentConfig(
@@ -294,44 +265,6 @@ def run_translation(text: str) -> str:
     logger.info("==== [Translation] ====")
     logger.info(f"[Input Text]\n{text}")
 
-    normalized_input = normalize_text(text)
-
-    # 캐시 맵핑 (양방향 모두 포함)
-    cache_map = {
-        # 1. 한국어 -> 점자
-        normalize_text(PREDEFINED_DATA["trans_1_src"]): PREDEFINED_DATA["trans_1_tgt"],
-        normalize_text(PREDEFINED_DATA["trans_2_src"]): PREDEFINED_DATA["trans_2_tgt"],
-        normalize_text(PREDEFINED_DATA["trans_3_src"]): PREDEFINED_DATA["trans_3_tgt"],
-        normalize_text(PREDEFINED_DATA["summary_case_sum"]): PREDEFINED_DATA[
-            "summary_case_braille"
-        ],
-        # 2. 점자 -> 한국어 (역방향)
-        normalize_text(PREDEFINED_DATA["trans_1_tgt"]): PREDEFINED_DATA["trans_1_src"],
-        normalize_text(PREDEFINED_DATA["trans_2_tgt"]): PREDEFINED_DATA["trans_2_src"],
-        normalize_text(PREDEFINED_DATA["trans_3_tgt"]): PREDEFINED_DATA["trans_3_src"],
-    }
-
-    progress_text = "AI 모델 연결 중..."
-    my_bar = st.progress(0, text=progress_text)
-
-    # 1. 캐시 히트
-    if normalized_input in cache_map:
-        logger.info(f"[Cache Hit] Translation")
-        for percent_complete in range(0, 101, 10):
-            time.sleep(0.15)
-            if percent_complete < 30:
-                msg = "요청 전송 중..."
-            elif percent_complete < 70:
-                msg = "번역 중..."
-            else:
-                msg = "결과 처리 중..."
-            my_bar.progress(percent_complete, text=msg)
-
-        my_bar.progress(100, text="완료.")
-        time.sleep(0.5)
-        my_bar.empty()
-        return cache_map[normalized_input]
-
     # 2. 실제 로직
     try:
         if st.session_state.mode == "text_to_braille":
@@ -410,42 +343,6 @@ def run_translation(text: str) -> str:
 def validate_translation(src: str, tgt_ui_text: str) -> dict:
     progress_text = "번역 검증 중..."
     val_bar = st.progress(0, text=progress_text)
-
-    normalized_src = normalize_text(src)
-    cached_sources = [
-        normalize_text(PREDEFINED_DATA["trans_1_src"]),
-        normalize_text(PREDEFINED_DATA["trans_2_src"]),
-        normalize_text(PREDEFINED_DATA["trans_3_src"]),
-        normalize_text(PREDEFINED_DATA["summary_case_sum"]),
-        normalize_text(PREDEFINED_DATA["summary_case_src"]),
-        normalize_text(PREDEFINED_DATA["trans_1_tgt"]),
-        normalize_text(PREDEFINED_DATA["trans_2_tgt"]),
-        normalize_text(PREDEFINED_DATA["trans_3_tgt"]),
-    ]
-
-    if normalized_src in cached_sources:
-        steps = [
-            "역번역 수행 중...",
-            "원문과 비교 중...",
-            "검증 마무리 중...",
-        ]
-        step_percents = [30, 60, 100]
-        for step_idx, step_msg in enumerate(steps):
-            val_bar.progress(step_percents[step_idx], text=step_msg)
-            time.sleep(0.6)
-        val_bar.empty()
-        return {
-            "is_valid": True,
-            "message": "자동 검증 성공 (정방향-역방향 일치).",
-            "recon_text": "",
-            "sentence_results": [],
-            "times": {
-                "back_translation": 0,
-                "semantic": 0,
-                "total_validation": 0,
-            },
-            "logs": [],
-        }
 
     try:
         # 프롬프트 설정
