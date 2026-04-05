@@ -828,9 +828,6 @@ if "last_val_msg" in st.session_state and st.session_state.last_val_msg:
 # 번역 + 검증 로직 (업그레이드 버전)
 # ----------------------------
 if mode == "Translation" and "go_translate" in locals() and go_translate and src_nfc:
-    st.session_state["src_sents"] = []
-    st.session_state["tgt_sents"] = []
-
     st.session_state.last_val_msg = ""
     st.session_state.last_is_valid = None
 
@@ -875,6 +872,13 @@ if mode == "Translation" and "go_translate" in locals() and go_translate and src
 
     src_sents = st.session_state.get("src_sents", [real_src])
     tgt_sents = st.session_state.get("tgt_sents", [result])
+
+    # 🔥 핵심: 빈 경우 fallback
+    if not src_sents:
+        src_sents = [real_src]
+
+    if not tgt_sents:
+        tgt_sents = [result]
 
     recon_sents = []
     logs = []
