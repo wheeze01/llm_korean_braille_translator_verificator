@@ -164,6 +164,7 @@ def normalize_text(text: str) -> str:
 def gemini_summarize(text: str, source_language: str) -> str:
     normalized_input = normalize_text(text)
 
+    progress_text = "요약 중..."
     my_bar = st.progress(0, text=progress_text)
 
     client = genai.Client(api_key=GEMINI_API_KEY)
@@ -264,6 +265,9 @@ def _safe_str(x, fallback=""):
 def run_translation(text: str) -> str:
     logger.info("==== [Translation] ====")
     logger.info(f"[Input Text]\n{text}")
+
+    progress_text = "AI 모델 연결 중..."
+    my_bar = st.progress(0, text=progress_text)
 
     # 2. 실제 로직
     try:
