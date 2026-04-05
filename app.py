@@ -828,6 +828,8 @@ if "last_val_msg" in st.session_state and st.session_state.last_val_msg:
 # 번역 + 검증 로직 (업그레이드 버전)
 # ----------------------------
 if mode == "Translation" and "go_translate" in locals() and go_translate and src_nfc:
+    st.session_state["src_sents"] = []
+    st.session_state["tgt_sents"] = []
 
     st.session_state.last_val_msg = ""
     st.session_state.last_is_valid = None
@@ -894,6 +896,18 @@ if mode == "Translation" and "go_translate" in locals() and go_translate and src
 
     recon_text = " ".join(recon_sents)
 
+    # ----------------------------
+    # 🧠 문장별 결과 구조화 (추가)
+    # ----------------------------
+    sentence_results = []
+
+    for i, (s, t, r) in enumerate(zip(src_sents, tgt_sents, recon_sents), 1):
+        is_match = normalize_text(s) == normalize_text(r)
+
+        sentence_results.append(
+            {"index": i, "source": s, "braille": t, "recon": r, "is_valid": is_match}
+        )
+
     back_time = time.time() - back_start
 
     # ----------------------------
@@ -934,17 +948,42 @@ if mode == "Translation" and "go_translate" in locals() and go_translate and src
     # ----------------------------
     st.markdown("### 🧠 문장별 검증")
 
-    for i, (s, t, r) in enumerate(zip(src_sents, tgt_sents, recon_sents), 1):
-        st.markdown(f"**문장 {i}**")
+    st.markdown("### 🧠 문장별 검증 결과")
 
-        st.write("원문:", s)
-        st.write("점자:", t)
-        st.write("역번역:", r)
+    fail_count = 0
 
-        if normalize_text(s) == normalize_text(r):
-            st.success("✔ 자동 검증 통과")
+    for item in sentence_results:
+
+        if item["is_valid"]:
+            with st.container():
+                st.markdown(f"🟢 **문장 {item['index']} (정상)**")
+                st.write("원문:", item["source"])
+                st.write("점자:", item["braille"])
+
         else:
-            st.error("⚠ 검수 필요")
+            fail_count += 1
+
+            with st.container():
+                st.markdown(f"🔴 **문장 {item['index']} (검수 필요)**")
+
+                st.error("⚠ 이 문장은 검수가 필요합니다")
+
+                st.write("원문:", item["source"])
+                st.write("점자:", item["braille"])
+                st.write("역번역:", item["recon"])
+
+                # 🔽 간단한 원인 추정 (추가)
+                if len(item["source"]) != len(item["recon"]):
+                    st.caption("→ 길이 불일치 (누락/요약 가능성)")
+                else:
+                    st.caption("→ 표현 차이 (의미 검증 필요)")
+
+    total = len(sentence_results)
+
+    if fail_count > 0:
+        st.warning(f"⚠ {fail_count}/{total} 문장에서 검수 필요")
+    else:
+        st.success("✅ 모든 문장 자동 검증 완료")
 
     # ----------------------------
     # 🎯 최종 결과
