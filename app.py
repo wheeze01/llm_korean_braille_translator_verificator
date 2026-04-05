@@ -407,7 +407,7 @@ def run_translation(text: str) -> str:
 # ----------------------------
 # Validation
 # ----------------------------
-def validate_translation(src: str, tgt_ui_text: str) -> str:
+def validate_translation(src: str, tgt_ui_text: str) -> dict:
     progress_text = "번역 검증 중..."
     val_bar = st.progress(0, text=progress_text)
 
@@ -460,73 +460,169 @@ def validate_translation(src: str, tgt_ui_text: str) -> str:
         )
         val_bar.progress(10, text="검증 준비 중...")
 
+        validation_total_start = time.time()
+        back_translation_start = time.time()
+        semantic_time_total = 0.0
+        logs = []
+
         if USE_SENTENCE_LEVEL_TRANSLATION:
             tgt_sents = st.session_state.get("tgt_sents")
             # 버퍼가 없으면 생성
             if not tgt_sents:
                 tgt_sents, _, _ = sentenceize_with_line_map(tgt_ui_text)
 
+            src_sents = st.session_state.get("src_sents")
+            if not src_sents:
+                src_sents, _, _ = sentenceize_with_line_map(src)
+
+            if not src_sents:
+                src_sents = [src]
+
+            if not tgt_sents:
+                tgt_sents = [tgt_ui_text]
+
+            sentence_results = []
             recon_sents = []
+
             total = len(tgt_sents)
-            for i, tgt_sent in enumerate(tgt_sents, 1):
+
+            for i in range(total):
+                tgt_sent = tgt_sents[i] if i < len(tgt_sents) else ""
+                src_sent = src_sents[i] if i < len(src_sents) else ""
+
                 val_bar.progress(
-                    10 + int((i / total) * 40),
-                    text=f"역번역 중 ({i}/{total})...",
+                    10 + int(((i + 1) / max(total, 1)) * 40),
+                    text=f"역번역 중 ({i+1}/{total})...",
                 )
+
                 if not _safe_str(tgt_sent):
                     recon_sents.append("")
+                    sentence_results.append(
+                        {
+                            "index": i + 1,
+                            "source": src_sent,
+                            "braille": tgt_sent,
+                            "recon": "",
+                            "ok": False,
+                            "method": "empty",
+                            "reason": "빈 문장",
+                        }
+                    )
+                    logs.append(f"[Sentence {i+1}] empty target")
                     continue
-                out = llm_chat(system_msg, tgt_sent, lang)
-                recon_sents.append(_safe_str(out, ""))
+
+                # 1) 역번역
+                recon = llm_chat(system_msg, tgt_sent, lang)
+                recon = _safe_str(recon, "")
+                recon_sents.append(recon)
+                logs.append(f"[Sentence {i+1}] back-translation done")
+
+                # 2) exact check
+                if normalize_text(recon) == normalize_text(src_sent):
+                    sentence_results.append(
+                        {
+                            "index": i + 1,
+                            "source": src_sent,
+                            "braille": tgt_sent,
+                            "recon": recon,
+                            "ok": True,
+                            "method": "exact",
+                            "reason": "exact match",
+                        }
+                    )
+                    logs.append(f"[Sentence {i+1}] exact match")
+                    continue
+
+                # 3) semantic check
+                semantic_start = time.time()
+
+                client = genai.Client(api_key=GEMINI_API_KEY)
+                cfg = genai.types.GenerateContentConfig(
+                    temperature=0.0,
+                    response_mime_type="application/json",
+                    thinking_config=genai.types.ThinkingConfig(thinking_budget=0),
+                    system_instruction=VALIDATION_SYSTEM_PROMPT,
+                )
+                contents = f"src: {src_sent}\n\nrecon: {recon}"
+
+                logger.info("==== [Gemini Request: Sentence Validation] ====")
+                logger.info(f"Contents: \n{contents}")
+
+                resp = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    config=cfg,
+                    contents=contents,
+                )
+
+                logger.info("==== [Gemini Response: Sentence Validation] ====")
+                logger.info(f"Response: {resp.text}")
+
+                parsed = json.loads(resp.text)
+                semantic_ok = parsed.get("equal") is True
+
+                semantic_time_total += time.time() - semantic_start
+
+                if semantic_ok:
+                    sentence_results.append(
+                        {
+                            "index": i + 1,
+                            "source": src_sent,
+                            "braille": tgt_sent,
+                            "recon": recon,
+                            "ok": True,
+                            "method": "semantic",
+                            "reason": "semantic match",
+                        }
+                    )
+                    logs.append(f"[Sentence {i+1}] semantic match")
+                else:
+                    sentence_results.append(
+                        {
+                            "index": i + 1,
+                            "source": src_sent,
+                            "braille": tgt_sent,
+                            "recon": recon,
+                            "ok": False,
+                            "method": "fail",
+                            "reason": "semantic mismatch",
+                        }
+                    )
+                    logs.append(f"[Sentence {i+1}] semantic mismatch")
+
+            back_translation_time = time.time() - back_translation_start
+
             recon_joined = " ".join([s for s in recon_sents if s])
 
-            val_bar.progress(60, text="텍스트 비교 중...")
-            if unicodedata.normalize("NFC", recon_joined) == unicodedata.normalize(
-                "NFC", src
-            ):
-                val_bar.progress(100, text="검증 성공.")
-                time.sleep(0.5)
-                val_bar.empty()
-                return True, "자동 검증 성공 (정방향-역방향 일치)."
+            val_bar.progress(70, text="문장별 검증 결과 집계 중...")
 
-            val_bar.progress(70, text="의미 일치 여부 확인 중...")
-            client = genai.Client(api_key=GEMINI_API_KEY)
-            cfg = genai.types.GenerateContentConfig(
-                temperature=0.0,
-                response_mime_type="application/json",
-                thinking_config=genai.types.ThinkingConfig(thinking_budget=0),
-                system_instruction=VALIDATION_SYSTEM_PROMPT,
-            )
-            contents = f"src: {src}\n\nrecon: {recon_joined}"
+            all_ok = all(item["ok"] for item in sentence_results)
+            fail_count = sum(1 for item in sentence_results if not item["ok"])
 
-            # [추가됨] Gemini Request 로깅
-            logger.info("==== [Gemini Request: Validation] ====")
-            logger.info(f"Contents: \n{contents}")
+            recon_joined = " ".join([s for s in recon_sents if s])
 
-            resp = client.models.generate_content(
-                model="gemini-2.5-flash", config=cfg, contents=contents
-            )
+            validation_total_time = time.time() - validation_total_start
 
-            # [추가됨] Gemini Response 로깅
-            logger.info("==== [Gemini Response: Validation] ====")
-            logger.info(f"Response: {resp.text}")
-
-            parsed = json.loads(resp.text)
-
-            val_bar.progress(100, text="Done.")
-            time.sleep(0.5)
+            val_bar.progress(100, text="검증 완료.")
+            time.sleep(0.3)
             val_bar.empty()
 
-            if parsed.get("equal") is True:
-                return (
-                    True,
-                    "자동 검증 실패 (정방향-역방향 불일치), 의미 기반 검증 성공.",
-                )
+            if all_ok:
+                msg = "✅ 전체 문장 검증 완료"
             else:
-                return (
-                    False,
-                    "자동 검증 실패 (정방향-역방향 불일치), 의미 기반 검증 실패. 추가 검토가 필요합니다.",
-                )
+                msg = f"⚠ {fail_count}/{len(sentence_results)} 문장에서 검수 필요"
+
+            return {
+                "is_valid": all_ok,
+                "message": msg,
+                "recon_text": recon_joined,
+                "sentence_results": sentence_results,
+                "times": {
+                    "back_translation": back_translation_time,
+                    "semantic": semantic_time_total,
+                    "total_validation": validation_total_time,
+                },
+                "logs": logs,
+            }
         else:
             # 줄단위 검증 로직
             tgt_lines = tgt_ui_text.split("\n")
@@ -825,7 +921,7 @@ if "last_val_msg" in st.session_state and st.session_state.last_val_msg:
 
 
 # ----------------------------
-# 번역 + 검증 로직 (업그레이드 버전)
+# 번역 + 검증 로직 (최종 완성 버전)
 # ----------------------------
 if mode == "Translation" and "go_translate" in locals() and go_translate and src_nfc:
     st.session_state.last_val_msg = ""
@@ -833,19 +929,13 @@ if mode == "Translation" and "go_translate" in locals() and go_translate and src
 
     validation_placeholder.empty()
 
-    # A. 번역 대상 결정
     real_src = (
         st.session_state.summary_text if st.session_state.summary_text else src_nfc
     )
 
-    # ----------------------------
-    # ⏱ 전체 시작
-    # ----------------------------
     total_start = time.time()
 
-    # ----------------------------
     # 1️⃣ 번역
-    # ----------------------------
     progress_text = st.empty()
     progress_text.info("1️⃣ 번역 중...")
 
@@ -855,7 +945,6 @@ if mode == "Translation" and "go_translate" in locals() and go_translate and src
 
     st.session_state.tgt_text = result
 
-    # 번역 결과 먼저 출력
     output_placeholder.text_area(
         "Target Text",
         value=result,
@@ -863,124 +952,78 @@ if mode == "Translation" and "go_translate" in locals() and go_translate and src
         label_visibility="collapsed",
     )
 
-    # ----------------------------
-    # 2️⃣ 역번역
-    # ----------------------------
-    progress_text.info("2️⃣ 역번역 중...")
+    # 2️⃣ 검증 (🔥 핵심: 여기서만 수행)
+    progress_text.info("2️⃣ 검증 중...")
 
-    back_start = time.time()
+    validation_result = validate_translation(real_src, result)
 
-    src_sents = st.session_state.get("src_sents", [real_src])
-    tgt_sents = st.session_state.get("tgt_sents", [result])
+    is_valid = validation_result["is_valid"]
+    val_msg = validation_result["message"]
+    recon_text = validation_result["recon_text"]
+    sentence_results = validation_result["sentence_results"]
+    validation_times = validation_result["times"]
+    logs = validation_result["logs"]
 
-    # 🔥 핵심: 빈 경우 fallback
-    if not src_sents:
-        src_sents = [real_src]
-
-    if not tgt_sents:
-        tgt_sents = [result]
-
-    recon_sents = []
-    logs = []
-
-    for i, sent in enumerate(tgt_sents, 1):
-        logs.append(f"[Back-Translation] Sentence {i}")
-
-        if st.session_state.src_lang == "Korean":
-            system_msg = BRAILLE_TO_KOREAN_SYSTEM_PROMPT
-            lang = "Korean"
-        else:
-            system_msg = BRAILLE_TO_ENGLISH_SYSTEM_PROMPT
-            lang = "English"
-
-        out = llm_chat(system_msg, sent, lang)
-
-        recon_sents.append(out)
-        logs.append(f"[Result] {out[:50]}...")
-
-    recon_text = " ".join(recon_sents)
-
-    # ----------------------------
-    # 🧠 문장별 결과 구조화 (추가)
-    # ----------------------------
-    sentence_results = []
-
-    for i, (s, t, r) in enumerate(zip(src_sents, tgt_sents, recon_sents), 1):
-        is_match = normalize_text(s) == normalize_text(r)
-
-        sentence_results.append(
-            {"index": i, "source": s, "braille": t, "recon": r, "is_valid": is_match}
-        )
-
-    back_time = time.time() - back_start
-
-    # ----------------------------
-    # 3️⃣ 검증
-    # ----------------------------
-    progress_text.info("3️⃣ 검증 중...")
-
-    verify_start = time.time()
-
-    is_valid = normalize_text(recon_text) == normalize_text(real_src)
-    logs.append(f"[Compare] Exact match: {is_valid}")
-
-    verify_time = time.time() - verify_start
+    back_time = validation_times["back_translation"]
+    semantic_time = validation_times["semantic"]
+    verify_time = validation_times["total_validation"]
 
     total_time = time.time() - total_start
 
     progress_text.success("✅ 처리 완료")
 
     # ----------------------------
-    # 📊 시간 표시
+    # ⏱ 시간 표시
     # ----------------------------
     st.markdown("### ⏱ 처리 시간")
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("번역", f"{translation_time:.2f}s")
     col2.metric("역번역", f"{back_time:.2f}s")
-    col3.metric("검증", f"{verify_time:.2f}s")
-    col4.metric("총 시간", f"{total_time:.2f}s")
+    col3.metric("Semantic", f"{semantic_time:.2f}s")
+    col4.metric("검증", f"{verify_time:.2f}s")
+    col5.metric("총 시간", f"{total_time:.2f}s")
 
     # ----------------------------
-    # 🔁 역번역 결과 표시
+    # 🔁 역번역 결과
     # ----------------------------
     st.markdown("### 🔁 역번역 결과")
     st.text_area("", value=recon_text, height=120)
 
     # ----------------------------
-    # 🧠 문장별 검증
+    # 🧠 문장별 검증 결과 (🔥 핵심 개선)
     # ----------------------------
-    st.markdown("### 🧠 문장별 검증")
-
     st.markdown("### 🧠 문장별 검증 결과")
 
     fail_count = 0
 
     for item in sentence_results:
+        idx = item["index"]
 
-        if item["is_valid"]:
+        if item["ok"] and item["method"] == "exact":
             with st.container():
-                st.markdown(f"🟢 **문장 {item['index']} (정상)**")
+                st.markdown(f"🟢 **문장 {idx} (Exact 일치)**")
                 st.write("원문:", item["source"])
                 st.write("점자:", item["braille"])
+                st.write("역번역:", item["recon"])
+
+        elif item["ok"] and item["method"] == "semantic":
+            with st.container():
+                st.markdown(f"🟡 **문장 {idx} (Semantic 일치)**")
+                st.write("원문:", item["source"])
+                st.write("점자:", item["braille"])
+                st.write("역번역:", item["recon"])
+                st.info("Exact 불일치지만 의미는 동일")
 
         else:
             fail_count += 1
 
             with st.container():
-                st.markdown(f"🔴 **문장 {item['index']} (검수 필요)**")
-
-                st.error("⚠ 이 문장은 검수가 필요합니다")
-
+                st.markdown(f"🔴 **문장 {idx} (검수 필요)**")
+                st.error("⚠ 의미까지 불일치")
                 st.write("원문:", item["source"])
                 st.write("점자:", item["braille"])
                 st.write("역번역:", item["recon"])
-
-                # 🔽 간단한 원인 추정 (추가)
-                if len(item["source"]) != len(item["recon"]):
-                    st.caption("→ 길이 불일치 (누락/요약 가능성)")
-                else:
-                    st.caption("→ 표현 차이 (의미 검증 필요)")
 
     total = len(sentence_results)
 
@@ -992,10 +1035,13 @@ if mode == "Translation" and "go_translate" in locals() and go_translate and src
     # ----------------------------
     # 🎯 최종 결과
     # ----------------------------
+    st.session_state.last_val_msg = val_msg
+    st.session_state.last_is_valid = is_valid
+
     if is_valid:
-        validation_placeholder.success("✅ 자동 검증 완료 (사람 검수 불필요)")
+        validation_placeholder.success(val_msg)
     else:
-        validation_placeholder.error("⚠ 일부 구간 검수 필요")
+        validation_placeholder.error(val_msg)
 
     # ----------------------------
     # 🔍 로그
@@ -1003,20 +1049,5 @@ if mode == "Translation" and "go_translate" in locals() and go_translate and src
     st.markdown("### 🔍 처리 로그")
 
     with st.expander("로그 보기"):
-        for log in logs[:15]:
+        for log in logs[:30]:
             st.text(log)
-
-    # ----------------------------
-    # 설명
-    # ----------------------------
-    st.info(
-        """
-    🔎 검증 방식:
-    1. 점자로 번역
-    2. 다시 텍스트로 역번역
-    3. 원문과 비교
-    → 일치하면 자동 검증 통과
-    """
-    )
-
-    st.caption("※ 모든 결과는 실시간 AI 모델을 통해 생성됩니다.")
