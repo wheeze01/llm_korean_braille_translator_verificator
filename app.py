@@ -434,7 +434,18 @@ def validate_translation(src: str, tgt_ui_text: str) -> dict:
             val_bar.progress(step_percents[step_idx], text=step_msg)
             time.sleep(0.6)
         val_bar.empty()
-        return True, "자동 검증 성공 (정방향-역방향 일치)."
+        return {
+            "is_valid": True,
+            "message": "자동 검증 성공 (정방향-역방향 일치).",
+            "recon_text": "",
+            "sentence_results": [],
+            "times": {
+                "back_translation": 0,
+                "semantic": 0,
+                "total_validation": 0,
+            },
+            "logs": [],
+        }
 
     try:
         # 프롬프트 설정
@@ -639,7 +650,18 @@ def validate_translation(src: str, tgt_ui_text: str) -> dict:
             val_bar.progress(60, text="텍스트 비교 중...")
             if recon == src:
                 val_bar.empty()
-                return True, "자동 검증 성공 (정방향-역방향 일치)."
+                return {
+                    "is_valid": True,
+                    "message": "자동 검증 성공 (정방향-역방향 일치).",
+                    "recon_text": "",
+                    "sentence_results": [],
+                    "times": {
+                        "back_translation": 0,
+                        "semantic": 0,
+                        "total_validation": 0,
+                    },
+                    "logs": [],
+                }
 
             val_bar.progress(70, text="의미 일치 여부 확인 중...")
             client = genai.Client(api_key=GEMINI_API_KEY)
@@ -677,7 +699,18 @@ def validate_translation(src: str, tgt_ui_text: str) -> dict:
 
     except Exception as e:
         val_bar.empty()
-        return False, f"검증 오류: {e}"
+        return {
+            "is_valid": False,
+            "message": f"검증 오류: {e}",
+            "recon_text": "",
+            "sentence_results": [],
+            "times": {
+                "back_translation": 0,
+                "semantic": 0,
+                "total_validation": 0,
+            },
+            "logs": [str(e)],
+        }
 
 
 # ----------------------------
